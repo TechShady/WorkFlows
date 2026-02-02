@@ -1,0 +1,147 @@
+metadata:
+  version: '1'
+  dependencies:
+    apps:
+    - id: dynatrace.automations
+      version: ^1.2538.1
+    - id: dynatrace.davis.copilot.workflow.actions
+      version: ^1.1.2
+    - id: dynatrace.email
+      version: ^1.8.5
+  inputs: []
+workflow:
+  title: Services Failure Rate Report
+  description: This agent generates infrastructure optmization reports and emails
+    to the specified addresses.
+  schemaVersion: 3
+  trigger: {}
+  result: null
+  type: STANDARD
+  input: {}
+  hourlyExecutionLimit: 10
+  guide: '# Infrastructure Optimization Agent
+
+    Get recommendations on how to reduce cost and minimize risk by optimizing your
+    infrastructure. This agent queries Grail and provides data to Dynatrace Assist
+    to get recommendations. These recommendations are then sent to email(s) of your
+    choice.
+
+
+    # Setup
+
+    1. Goto the [Workflow Input](?options=) and scroll down to `Workflow input and
+    result`.
+
+    2. Change `scope` to include or exclude desired scope. Note: if you are not monitoring
+    some domains, e.g. `network`, please set to `false`.
+
+    3. Change emails (`to`, `cc`, `bcc`) to be an array of strings, e.g.:
+
+    ```
+
+    "to": [ "me@email.com", "you@email.com"]
+
+    ```
+
+    4. Test with a manual Run, by click the `Run` button.
+
+    5. If everything works as expected, change the [Trigger](?trigger=) to a schedule,
+    e.g. Weekly, Daily, etc.
+
+
+
+    # More advanced interactions
+
+    Consider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp)
+    or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp
+    ).'
+  tasks:
+    tenant:
+      name: tenant
+      input:
+        query: 'fetch dt.entity.environment
+
+          | fields URL=concat("[Open in Dynatrace](http://",dt.system.environment,".apps.dynatrace.com/ui/apps/dynatrace.services/explorer?perspective=performance&sort=healthIndicators%3Adescending)")
+
+          | limit 1'
+      action: dynatrace.automations:execute-dql-query
+      position:
+        x: -1
+        y: 1
+      description: Make use of Dynatrace Grail data in your workflow.
+      predecessors: []
+    email_host_report:
+      name: email_host_report
+      input:
+        cc: []
+        to: []
+        bcc: []
+        content: "{{result(\"service_report_prompt\").text}}\n# ___________________________________\n\
+          {% for type in result(\"tenant\").records %}\n    {% for key, value in type.items()\
+          \ %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\\
+          r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n"
+        subject: Services Failure Rate Report
+      action: dynatrace.email:send-email
+      position:
+        x: 0
+        y: 3
+      conditions:
+        else: SKIP
+        custom: ''
+        states:
+          service_report_prompt: OK
+      description: Send email
+      predecessors:
+      - service_report_prompt
+    service_failure_rate:
+      name: service_failure_rate
+      input:
+        query: "timeseries {\n  failure_count = sum(dt.service.request.failure_count,\
+          \ scalar: true),\n  request_count = sum(dt.service.request.count, scalar:\
+          \ true)\n}, by: { dt.entity.service }, from: now()-7d, to: now()\n| fieldsAdd\
+          \ service_name = entityName(dt.entity.service)\n| fieldsAdd failure_rate\
+          \ = if(request_count > 0, (failure_count / request_count) * 100, else: 0)\n\
+          | filter failure_count > 0\n| sort failure_count desc\n| limit 20\n| fields\
+          \ service_name, failure_count, request_count, failure_rate\n\n"
+      action: dynatrace.automations:execute-dql-query
+      position:
+        x: 0
+        y: 1
+      conditions:
+        else: SKIP
+        custom: ''
+        states: {}
+      description: Make use of Dynatrace Grail data in your workflow.
+      predecessors: []
+    service_report_prompt:
+      name: service_report_prompt
+      input:
+        config: disabled
+        prompt: 'Provide a markdown report for the following use case:
+
+          ## Service Failure Rate Report
+
+          '
+        autoTrim: true
+        instruction: Instead of bulleted list, format example services in a table.
+        supplementary: 'Use this analysis of Services for the past 30 days:
+
+          {{result("service_failure_rate")["records"]}}'
+      retry:
+        count: 2
+        delay: 30
+        failedLoopIterationsOnly: true
+      action: dynatrace.davis.copilot.workflow.actions:davis-copilot
+      position:
+        x: 0
+        y: 2
+      conditions:
+        else: SKIP
+        custom: ''
+        states:
+          tenant: OK
+          service_failure_rate: OK
+      description: Prompt the Dynatrace Intelligence generative AI
+      predecessors:
+      - tenant
+      - service_failure_rate
