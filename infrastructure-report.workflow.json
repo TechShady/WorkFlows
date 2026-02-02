@@ -1,9 +1,6 @@
 {
-  "id": "116a0bab-bd1a-4a44-a988-2841238d76b0",
   "title": "Infrastructure Report",
   "description": "This agent generates infrastructure optmization reports and emails to the specified addresses.",
-  "actor": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
-  "owner": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
   "ownerType": "USER",
   "isPrivate": true,
   "schemaVersion": 3,
