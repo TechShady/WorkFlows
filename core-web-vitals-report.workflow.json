@@ -74,7 +74,7 @@
         "config": "dynatrace",
         "prompt": "Provide a report for the following use case:\nCore Web Vitals Report\n",
         "autoTrim": true,
-        "instruction": "Instead of bulleted list, format observations and recommendations in a table and format cwv in another table. ",
+        "instruction": "Instead of bulleted list, format observations and recommendations in a table. Provide Key Metrics Definition and Next Steps. Format cwv in another table. ",
         "supplementary": "Use this analysis of Services for the past 30 days:\n{{result(\"cwv\")[\"records\"]}}"
       },
       "retry": {
