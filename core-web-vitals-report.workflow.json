@@ -46,7 +46,9 @@
       "name": "email_cwv_report",
       "input": {
         "cc": [],
-        "to": [],
+        "to": [
+          "john.kelly@dynatrace.com"
+        ],
         "bcc": [],
         "content": "{{result(\"cwv_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
         "subject": "Core Web Vitals Report"
@@ -74,7 +76,7 @@
         "config": "dynatrace",
         "prompt": "Provide a report for the following use case:\nCore Web Vitals Report\n",
         "autoTrim": true,
-        "instruction": "Instead of bulleted list, format cwv in a table and format observations and recommendations in another table. ",
+        "instruction": "Instead of bulleted list, format observations and recommendations in a table and format cwv in another table. ",
         "supplementary": "Use this analysis of Services for the past 30 days:\n{{result(\"cwv\")[\"records\"]}}"
       },
       "retry": {
