@@ -46,9 +46,7 @@
       "name": "email_cwv_report",
       "input": {
         "cc": [],
-        "to": [
-          "john.kelly@dynatrace.com"
-        ],
+        "to": [],
         "bcc": [],
         "content": "{{result(\"cwv_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
         "subject": "Core Web Vitals Report"
