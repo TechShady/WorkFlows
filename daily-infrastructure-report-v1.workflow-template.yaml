@@ -1,0 +1,134 @@
+metadata:
+  version: "1"
+  dependencies:
+    apps:
+      - id: dynatrace.automations
+        version: ^1.2450.0
+      - id: dynatrace.email
+        version: ^1.8.4
+  inputs: []
+workflow:
+  title: Daily Infrastructure Report V1
+  tasks:
+    send_email_1:
+      name: send_email_1
+      description: Send email
+      action: dynatrace.email:send-email
+      input:
+        cc: []
+        to: []
+        bcc: []
+        content: >
+          #
+
+          # Infrastructure Utilization
+
+          #
+
+          {% for type in result("execute_dql_query_1").records %}
+              {% if loop.first %}
+                     {% for key in type.keys() %}| {{key}} {% endfor %} |
+                     {% for key in type.keys() %}| ---------  {% endfor %} |
+              {% endif %}
+              {% for key, value in type.items() %}| {{value | replace('|', '\\|') | replace('\n', ' ') | replace('\r', '') | replace('\t', ' ')}} {% endfor %} | 
+          {% endfor %}
+
+          # ___________________________________
+
+          {% for type in result("execute_dql_query_2").records %}
+              {% for key, value in type.items() %} {{value | replace('|', '\\|') | replace('\n', ' ') | replace('\r', '') | replace('\t', ' ')}} {% endfor %}  
+          {% endfor %}
+
+          # ___________________________________
+        subject: Dynatrace Daily Infrastructure Report
+      position:
+        x: 0
+        y: 3
+      predecessors:
+        - execute_dql_query_2
+      conditions:
+        states:
+          execute_dql_query_2: OK
+    execute_dql_query_1:
+      name: execute_dql_query_1
+      description: Make use of Dynatrace Grail data in your workflow.
+      action: dynatrace.automations:execute-dql-query
+      input:
+        query: >-
+          fetch dt.entity.host, from: @d-1d, to: @d
+
+          | filter id in [
+           
+            timeseries {  CPU=avg(dt.host.cpu.usage) }, by: {dt.entity.host}
+            | fieldsAdd CPU=arrayLast(CPU)
+            | filterOut isNull(CPU)
+            | sort CPU desc
+            | limit 10
+            
+            | append [
+              timeseries {  Memory=avg(dt.host.memory.usage) }, by: {dt.entity.host}
+              | fieldsAdd Memory=arrayLast(Memory)
+              | filterOut isNull(Memory)
+              | sort Memory desc
+              | limit 10  
+            ]
+
+            | append [
+              timeseries {  Disk=avg(dt.host.disk.used.percent) }, by: {dt.entity.host}
+              | fieldsAdd Disk=arrayLast(Disk)
+              | filterOut isNull(Disk)
+              | sort Disk desc
+              | limit 10  
+            ]
+
+            | dedup dt.entity.host 
+            | fields dt.entity.host
+          ]
+
+
+          | lookup [
+            timeseries {
+            CPU= avg(dt.host.cpu.usage),
+            Memory=avg(dt.host.memory.usage),
+            Disk=avg(dt.host.disk.used.percent)
+            }, by: {dt.entity.host}
+            | fields CPU=arrayLast(CPU), Memory=arrayLast(Memory), Disk=arrayLast(Disk), dt.entity.host
+          ], sourceField:id, lookupField:dt.entity.host, fields: {CPU, Memory,
+          Disk, dt.entity.host}, executionOrder:leftFirst
+
+
+          | fields Name=entity.name, `CPU()` =
+          concat(round(CPU,decimals:2),"%"), `Memory()` =
+          concat(round(Memory,decimals:2),"%"), `Disk()` =
+          concat(round(Disk,decimals:2),"%")
+
+          | sort `CPU()` desc
+      position:
+        x: 0
+        y: 1
+      predecessors: []
+    execute_dql_query_2:
+      name: execute_dql_query_2
+      description: Make use of Dynatrace Grail data in your workflow.
+      action: dynatrace.automations:execute-dql-query
+      input:
+        query: |-
+          fetch dt.entity.environment
+          | fields URL=concat("[Open in Dynatrace](http://",dt.system.environment,".apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Hosts?perspective=Health&sort=healthIndicators%3Adescending&timeframeStart=-1d%40d&timeframeEnd=%40d)")
+          | limit 1
+      position:
+        x: 0
+        y: 2
+      predecessors:
+        - execute_dql_query_1
+      conditions:
+        states:
+          execute_dql_query_1: OK
+  description: ""
+  trigger: {}
+  schemaVersion: 3
+  result: null
+  input: {}
+  hourlyExecutionLimit: 1000
+  guide: null
+  type: STANDARD
