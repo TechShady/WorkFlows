@@ -9,7 +9,7 @@
   "type": "STANDARD",
   "input": {},
   "hourlyExecutionLimit": 10,
-  "guide": "# Infrastructure Report\nGet a list of your top hosts (CPU, Disk & Memory) and get recommendations on how to reduce cost and minimize risk by optimizing your infrastructure. This agent queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "guide": "# Infrastructure Report\nGet a list of your top hosts (CPU, Disk & Memory) and get recommendations on how to reduce cost and minimize risk by optimizing your infrastructure. This agent queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings, e.g.:\n```\n\"to\": [ \"me@email.com\", \"you@email.com\"]\n```\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
   "tasks": {
     "tenant": {
       "name": "tenant",
