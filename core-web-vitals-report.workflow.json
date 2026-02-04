@@ -11,10 +11,10 @@
   "hourlyExecutionLimit": 10,
   "guide": "# Core Web Vitals Report\nGet a top 25 list of pages core web vitals with observations and recommendations. This agent queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings, e.g.:\n```\n\"to\": [ \"me@email.com\", \"you@email.com\"]\n```\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
   "tasks": {
-    "cwv": {
-      "name": "cwv",
+    "cwv_query": {
+      "name": "cwv_query",
       "input": {
-        "query": "fetch user.events, from: @d-1d, to: @d\n| filter characteristics.has_page_summary or characteristics.has_w3c_navigation_timings\n| filter isNotNull(page.name)\n| summarize {\n    wlcp = if(isNull(percentile(web_vitals.largest_contentful_paint, 75)), 0, else:percentile(web_vitals.largest_contentful_paint, 75)), \n    wfid = if(isNull(percentile(web_vitals.first_input_delay, 75)), 0, else:percentile(web_vitals.first_input_delay, 75)), \n    wcls = if(isNull(percentile(web_vitals.cumulative_layout_shift, 75)), 0, else:percentile(web_vitals.cumulative_layout_shift, 75)), \n    winp = if(isNull(percentile(web_vitals.interaction_to_next_paint, 75)), 0, else:percentile(web_vitals.interaction_to_next_paint, 75)), \n    Count = countIf(characteristics.has_w3c_navigation_timings)\n  }, by: { page.name, dt.rum.application.entity }\n| fieldsAdd dt.entity.application = dt.rum.application.entity\n| fieldsAdd Application = entityName(dt.entity.application)\n| fieldsRemove dt.entity.application\n| fields App=Application, Page = page.name, Count, CWVScore = if((wcls >= .1 or wfid/1000000 >= 100 or wlcp/1000000 >= 2500 or winp/1000000 >= 200), \"\u274cFail\", else: \"\u2705Pass\"), `LCP(ms)` = wlcp/1000000, `INP(ms)` = winp/1000000, `FID(ms)` = wfid/1000000, `CLS(#)` = round(wcls,decimals:4)\n| sort Count desc\n| limit 25"
+        "query": "fetch user.events, from: @d-1d, to: @d\n| filter characteristics.has_page_summary or characteristics.has_w3c_navigation_timings\n| filter isNotNull(page.name)\n| summarize {\n    wlcp = if(isNull(percentile(web_vitals.largest_contentful_paint, 75)), 0, else:percentile(web_vitals.largest_contentful_paint, 75)), \n    wcls = if(isNull(percentile(web_vitals.cumulative_layout_shift, 75)), 0, else:percentile(web_vitals.cumulative_layout_shift, 75)), \n    winp = if(isNull(percentile(web_vitals.interaction_to_next_paint, 75)), 0, else:percentile(web_vitals.interaction_to_next_paint, 75)), \n    Count = countIf(characteristics.has_w3c_navigation_timings)\n  }, by: { page.name, dt.rum.application.entity }\n| fieldsAdd dt.entity.application = dt.rum.application.entity\n| fieldsAdd Application = entityName(dt.entity.application)\n| fieldsRemove dt.entity.application\n| fields App=Application, Page = page.name, `Count` = Count, CWVScore = if(((wcls >= .1) or (toDouble(wlcp) >= 2500000000) or (toDouble(winp) >= 200000000)), \"\u274cFail\", else: \"\u2705Pass\"), `LCP(ms)` = wlcp/1000000, `INP(ms)` = winp/1000000, `CLS(#)` = round(wcls,decimals:4)\n| sort Count desc\n| limit 25"
       },
       "action": "dynatrace.automations:execute-dql-query",
       "position": {
@@ -29,8 +29,8 @@
       "description": "Make use of Dynatrace Grail data in your workflow.",
       "predecessors": []
     },
-    "tenant": {
-      "name": "tenant",
+    "tenant_query": {
+      "name": "tenant_query",
       "input": {
         "query": "fetch dt.entity.environment\n| fields URL=concat(\"[Open in Dynatrace](http://\",dt.system.environment,\".apps.dynatrace.com/ui/apps/dynatrace.experience.vitals/frontends)\")\n| limit 1"
       },
@@ -48,7 +48,7 @@
         "cc": [],
         "to": [],
         "bcc": [],
-        "content": "{{result(\"cwv_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "content": "{{result(\"cwv_query_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant_query\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
         "subject": "Core Web Vitals Report"
       },
       "action": "dynatrace.email:send-email",
@@ -60,22 +60,22 @@
         "else": "SKIP",
         "custom": "",
         "states": {
-          "cwv_report_prompt": "OK"
+          "cwv_query_report_prompt": "OK"
         }
       },
       "description": "Send email",
       "predecessors": [
-        "cwv_report_prompt"
+        "cwv_query_report_prompt"
       ]
     },
-    "cwv_report_prompt": {
-      "name": "cwv_report_prompt",
+    "cwv_query_report_prompt": {
+      "name": "cwv_query_report_prompt",
       "input": {
         "config": "dynatrace",
         "prompt": "Provide a report for the following use case:\nCore Web Vitals Report\n",
         "autoTrim": true,
-        "instruction": "Instead of bulleted list, format observations and recommendations in a table. Provide Key Metrics Definition and Next Steps. Format cwv in another table. ",
-        "supplementary": "Use this analysis of Services for the past 30 days:\n{{result(\"cwv\")[\"records\"]}}"
+        "instruction": " Provide Key Metrics Definition and Overall Pass/Fail summary. Format DQL query results, observations, recommendations and next steps in a table. All in this order.",
+        "supplementary": "Use this analysis of Services for the past 30 days:\n{{result(\"cwv_query\")[\"records\"]}}"
       },
       "retry": {
         "count": 2,
@@ -91,14 +91,14 @@
         "else": "SKIP",
         "custom": "",
         "states": {
-          "cwv": "OK",
-          "tenant": "OK"
+          "cwv_query": "OK",
+          "tenant_query": "OK"
         }
       },
       "description": "Prompt the Dynatrace Intelligence generative AI",
       "predecessors": [
-        "tenant",
-        "cwv"
+        "cwv_query",
+        "tenant_query"
       ]
     }
   }
