@@ -1,6 +1,6 @@
 {
-  "title": "Core Web Vitals Report",
-  "description": "This workflow generates a core web vitals report and emails to the specified addresses.",
+  "title": "Core Web Vitals Page Report",
+  "description": "This workflow generates a core web vitals page report and emails to the specified addresses.",
   "ownerType": "USER",
   "isPrivate": true,
   "schemaVersion": 3,
