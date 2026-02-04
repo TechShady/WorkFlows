@@ -1,0 +1,74 @@
+{
+  "title": "Infrastructure Report - Standard",
+  "description": "This agent generates infrastructure optmization reports and emails to the specified addresses.",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 3,
+  "trigger": {},
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 10,
+  "guide": "# Infrastructure Optimization Agent\nGet recommendations on how to reduce cost and minimize risk by optimizing your infrastructure. This agent queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Goto the [Workflow Input](?options=) and scroll down to `Workflow input and result`.\n2. Change `scope` to include or exclude desired scope. Note: if you are not monitoring some domains, e.g. `network`, please set to `false`.\n3. Change emails (`to`, `cc`, `bcc`) to be an array of strings, e.g.:\n```\n\"to\": [ \"me@email.com\", \"you@email.com\"]\n```\n4. Test with a manual Run, by click the `Run` button.\n5. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "tasks": {
+    "tenant": {
+      "name": "tenant",
+      "input": {
+        "query": "fetch dt.entity.environment\n| fields URL=concat(\"[Open in Dynatrace](http://\",dt.system.environment,\".apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Hosts?perspective=Health&sort=healthIndicators%3Adescending&timeframeStart=-1d%40d&timeframeEnd=%40d)\")\n| limit 1"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -1,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "host_utilization": {
+      "name": "host_utilization",
+      "input": {
+        "query": "fetch dt.entity.host, from: @d-1d, to: @d\n| filter id in [\n \n  timeseries {  CPU=avg(dt.host.cpu.usage) }, by: {dt.entity.host}\n  | fieldsAdd CPU=arrayLast(CPU)\n  | filterOut isNull(CPU)\n  | sort CPU desc\n  | limit 10\n  \n  | append [\n    timeseries {  Memory=avg(dt.host.memory.usage) }, by: {dt.entity.host}\n    | fieldsAdd Memory=arrayLast(Memory)\n    | filterOut isNull(Memory)\n    | sort Memory desc\n    | limit 10  \n  ]\n\n  | append [\n    timeseries {  Disk=avg(dt.host.disk.used.percent) }, by: {dt.entity.host}\n    | fieldsAdd Disk=arrayLast(Disk)\n    | filterOut isNull(Disk)\n    | sort Disk desc\n    | limit 10  \n  ]\n\n  | dedup dt.entity.host \n  | fields dt.entity.host\n]\n\n| lookup [\n  timeseries {\n  CPU= avg(dt.host.cpu.usage),\n  Memory=avg(dt.host.memory.usage),\n  Disk=avg(dt.host.disk.used.percent)\n  }, by: {dt.entity.host}\n  | fields CPU=arrayLast(CPU), Memory=arrayLast(Memory), Disk=arrayLast(Disk), dt.entity.host\n], sourceField:id, lookupField:dt.entity.host, fields: {CPU, Memory, Disk, dt.entity.host}, executionOrder:leftFirst\n\n| fields `Host` = entity.name, `CPU()` = concat(round(CPU,decimals:2),\"%\"), `Memory()` = concat(round(Memory,decimals:2),\"%\"), `Disk()` = concat(round(Disk,decimals:2),\"%\")\n| sort `CPU()` desc"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 1,
+        "y": 1
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {}
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "email_host_report": {
+      "name": "email_host_report",
+      "input": {
+        "cc": [],
+        "to": [],
+        "bcc": [],
+        "content": "#\n# Infrastructure Utilization\n#\n{% for type in result(\"host_utilization\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "subject": "Infrastructure Utilization Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 0,
+        "y": 3
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "tenant": "OK",
+          "host_utilization": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "tenant",
+        "host_utilization"
+      ]
+    }
+  }
+}
