@@ -1,9 +1,6 @@
 {
-  "id": "75386bd7-14d4-446f-84b0-12f27d0e19b5",
   "title": "Service Performance Report - Standard",
   "description": "This Workflow generates Service Performance reports and emails to the specified addresses.",
-  "actor": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
-  "owner": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
   "ownerType": "USER",
   "isPrivate": true,
   "schemaVersion": 3,
