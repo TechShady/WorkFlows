@@ -1,6 +1,6 @@
 {
   "title": "Core Web Vitals Page Report - Standard",
-  "description": "This workflow generates a core web vitals page report and emails to the specified addresses.",
+  "description": "This Wrkflow generates a core web vitals page report and emails to the specified addresses.",
   "ownerType": "USER",
   "isPrivate": true,
   "schemaVersion": 3,
@@ -9,7 +9,7 @@
   "type": "STANDARD",
   "input": {},
   "hourlyExecutionLimit": 10,
-  "guide": "# Core Web Vitals Report\nGet a top 25 list of pages core web vitals. This agent queries Grail and sends email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "guide": "# Core Web Vitals Report\nGet a top 25 list of pages core web vitals. This Workflow queries Grail and sends email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
   "tasks": {
     "cwv_query": {
       "name": "cwv_query",

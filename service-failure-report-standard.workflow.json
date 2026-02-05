@@ -1,0 +1,74 @@
+{
+  "title": "Service Failure Report - Standard",
+  "description": "This Workflow generates Service Failure reports and emails to the specified addresses.",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 3,
+  "trigger": {},
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 10,
+  "guide": "# Service Failure Report\nGet a list of your top failed Services. This Workflow queries Grail and then sends email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "tasks": {
+    "tenant": {
+      "name": "tenant",
+      "input": {
+        "query": "fetch dt.entity.environment\n| fields URL=concat(\"[Open in Dynatrace](http://\",dt.system.environment,\".apps.dynatrace.com/ui/apps/dynatrace.services/explorer?perspective=performance&sort=healthIndicators%3Adescending)\")\n| limit 1"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -1,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "service_failures": {
+      "name": "service_failures",
+      "input": {
+        "query": "timeseries {\n  failure_count = sum(dt.service.request.failure_count, scalar: true),\n  request_count = sum(dt.service.request.count, scalar: true)\n}, by: { dt.entity.service }, from: now()-7d, to: now()\n| fieldsAdd service_name = entityName(dt.entity.service)\n| fieldsAdd failure_rate = (failure_count / request_count) * 100\n| filter failure_count > 0\n| sort failure_count desc\n| limit 20\n| fields `Service` = service_name, `Failure Count` = failure_count, `Request Count` = request_count, `Failure Rate` = concat( round(failure_rate, decimals:2),\"%\")"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 1,
+        "y": 1
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {}
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "email_service_report": {
+      "name": "email_service_report",
+      "input": {
+        "cc": [],
+        "to": [],
+        "bcc": [],
+        "content": "#\n# Service Failue Report\n#\n{% for type in result(\"service_failures\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "subject": "Service Failure Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "tenant": "OK",
+          "service_failures": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "tenant",
+        "service_failures"
+      ]
+    }
+  }
+}

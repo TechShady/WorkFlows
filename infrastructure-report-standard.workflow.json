@@ -1,6 +1,6 @@
 {
   "title": "Infrastructure Report - Standard",
-  "description": "This agent generates infrastructure optmization reports and emails to the specified addresses.",
+  "description": "This Workflow generates infrastructure optmization reports and emails to the specified addresses.",
   "ownerType": "USER",
   "isPrivate": true,
   "schemaVersion": 3,
@@ -9,7 +9,7 @@
   "type": "STANDARD",
   "input": {},
   "hourlyExecutionLimit": 10,
-  "guide": "# Infrastructure Report\nGet a list of your top hosts (CPU, Disk & Memory).  This agent queries Grail and and send email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "guide": "# Infrastructure Report\nGet a list of your top hosts (CPU, Disk & Memory).  This Workflow queries Grail and and send email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
   "tasks": {
     "tenant": {
       "name": "tenant",
