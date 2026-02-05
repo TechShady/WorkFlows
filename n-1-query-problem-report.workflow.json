@@ -1,0 +1,90 @@
+{
+  "title": "N+1 Query Problem Report",
+  "description": "This Workflow generates a N+1 Query Problem report and emails to the specified addresses.",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 3,
+  "trigger": {},
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 10,
+  "guide": "# N+1 Query Problem Report\nGet a top list of N+1 Querries with observations and recommendations. This Workflow queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "tasks": {
+    "n1_query": {
+      "name": "n1_query",
+      "input": {
+        "query": "fetch spans\n| filter db.system != \"null\" and aggregation.count>25\n| fieldsAdd trace_id = toString(trace.id), span_id = toString(span.id)\n| fields   `N+1 Count` = aggregation.count,\n           `Query`=if(isNotNull(db.query.text),db.query.text,else:if(isNotNull(db.operation.name),db.operation.name, else: code.function)),\n           trace.id,\n           span.id,\n           span.name, \n           `Service Name` = entityName(dt.entity.service),\n           `Endpoint` = if(isnull(endpoint.name), span.name, else: endpoint.name),\n           `DB` = db.system\n| sort `N+1 Count` desc"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 0,
+        "y": 1
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {}
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "email_n1_report": {
+      "name": "email_n1_report",
+      "input": {
+        "cc": [],
+        "to": [],
+        "bcc": [],
+        "content": "{{result(\"n1_query_report_prompt\").text}}\n",
+        "subject": "N+1 Query Problem Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 0,
+        "y": 3
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "n1_query_report_prompt": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "n1_query_report_prompt"
+      ]
+    },
+    "n1_query_report_prompt": {
+      "name": "n1_query_report_prompt",
+      "input": {
+        "config": "dynatrace",
+        "prompt": "Provide a report for the following use case:\nN+1 Report\n",
+        "autoTrim": true,
+        "instruction": " Provide N+1 Definition and Overall summary. Format DQL query results, observations, recommendations and next steps in a table. All in this order.",
+        "supplementary": "Use this analysis of N+1 Query Problem for the past 24 hours:\n{{result(\"n1_query\")[\"records\"]}}"
+      },
+      "retry": {
+        "count": 2,
+        "delay": 30,
+        "failedLoopIterationsOnly": true
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "n1_query": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "n1_query"
+      ]
+    }
+  }
+}
