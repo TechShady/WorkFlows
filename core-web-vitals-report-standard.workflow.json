@@ -48,7 +48,7 @@
         "cc": [],
         "to": [],
         "bcc": [],
-        "content": "{{result(\"cwv_query_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant_query\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "content": "#\n# Core Web Vitals Report\n#\n{% for type in result(\"cwv_query\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n\n# ___________________________________\n{% for type in result(\"tenant_query\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
         "subject": "Core Web Vitals Report"
       },
       "action": "dynatrace.email:send-email",
