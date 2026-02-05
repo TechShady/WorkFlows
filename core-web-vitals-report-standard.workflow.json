@@ -1,0 +1,74 @@
+{
+  "title": "Core Web Vitals Report - Standard",
+  "description": "This Workflow generates a core web vitals application report and emails to the specified addresses.",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 3,
+  "trigger": {},
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 10,
+  "guide": "# Core Web Vitals Report\nGet a top 25 list of application core web vitals with observations and recommendations. This Workflow queries Grail and sends email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "tasks": {
+    "cwv_query": {
+      "name": "cwv_query",
+      "input": {
+        "query": "fetch dt.entity.application, from: @d-1d, to: @d\n| fieldsAdd frontend.type = \"web\"\n| fieldsAdd lifetime, tags, frontend.subtype = applicationType, frontend.injection.type = applicationInjectionType\n| append [\n    fetch dt.entity.mobile_application, from: @d-1d, to: @d\n    | fieldsAdd frontend.type = \"mobile\"\n    | fieldsAdd lifetime, tags, platforms = mobileOsFamily\n  ]\n| append [\n    fetch dt.entity.custom_application, from: @d-1d, to: @d\n    | fieldsAdd frontend.type = \"custom\"\n  ]\n| fieldsAdd frontend.id = id, frontend.id.hash = lower(if(matchesPhrase(id, \"APPLICATION-\"), splitString(id, \"-\")[1], else: id)), frontend.name = entity.name\n| fieldsRemove id, entity.name\n| join [\n    timeseries {\n        page.visit.count = sum(dt.frontend.web.navigation.load_event_end, rollup: count, default: 0, scalar: true),\n        page.visit.per_minutes = sum(dt.frontend.web.navigation.load_event_end, rollup: count, default: 0, rate: 1min, scalar: true),\n        lcp = percentile(dt.frontend.web.page.largest_contentful_paint, 75, scalar: true),\n        fid = percentile(dt.frontend.web.page.first_input_delay, 75, scalar: true),\n        cls = percentile(dt.frontend.web.page.cumulative_layout_shift, 75, scalar: true),\n        inp = percentile(dt.frontend.web.page.interaction_to_next_paint, 75, scalar: true),\n        activeUsers = countDistinct(dt.frontend.user.active.estimated_count, scalar: true),\n        activeSessions = countDistinct(dt.frontend.session.active.estimated_count, scalar: true)\n    },\n    union: TRUE,\n    by: { dt.rum.application.entity },\n    from: \"2026-01-16T03:38:01.735Z\", to: \"2026-01-16T15:38:01.735Z\"\n    | fieldsAdd cls = cls * 0.0001\n    | fieldsRename frontend.id = dt.rum.application.entity\n  ],\n  kind: leftOuter,\n  on: { left[frontend.id] == right[frontend.id] },\n  fields: { lcp, fid, cls, inp, page.visit.count, page.visit.per_minutes, activeUsers, activeSessions }\n// ---------------------------------------------------------------\n//  Error metrics\n// ---------------------------------------------------------------\n| join [\n    timeseries { error.count = sum(dt.frontend.error.count, default: 0, scalar: true), error.rate.per_minute = sum(dt.frontend.error.count, rate: 1m, default: 0, scalar: true) },\n    union: TRUE,\n    by: { dt.rum.application.entity, error.type },\n    from: \"2026-01-16T03:38:01.735Z\", to: \"2026-01-16T15:38:01.735Z\"\n    | fieldsRename frontend.id = dt.rum.application.entity\n    | summarize {\n        error.count = sum(if(error.type != \"crash\", error.count)),\n        crash.count = sum(if(error.type == \"crash\", error.count)),\n        error.rate.per_minute = sum(if(error.type != \"crash\", error.rate.per_minute)),\n        crashes.rate.per_minute = sum(if(error.type == \"crash\", error.rate.per_minute))\n      }, by: { frontend.id }\n  ],\n  kind: leftOuter,\n  on: { left[frontend.id] == right[frontend.id] },\n  fields: { error.count, error.rate.per_minute, crash.count, crashes.rate.per_minute }\n| fieldsAdd error.count = coalesce(error.count, 0), error.rate.per_minute = coalesce(error.rate.per_minute, 0), crash.count = coalesce(crash.count, 0), crashes.rate.per_minute = coalesce(crashes.rate.per_minute, 0)\n// ---------------------------------------------------------------\n//  App Start metrics\n// ---------------------------------------------------------------\n| join [\n    timeseries {\n        app_start.duration = percentile(dt.frontend.mobile.app_start.duration, 75, scalar: true),\n        app_starts = sum(dt.frontend.mobile.app_start.duration, rollup: count, default: 0, scalar: true),\n        app_start_count.rate.per_minute = sum(dt.frontend.mobile.app_start.duration, rollup: count, default: 0, rate: 1min, scalar: true)\n    },\n    union: TRUE,\n    by: { dt.rum.application.entity, app_start.type },\n    from: \"2026-01-16T03:38:01.735Z\", to: \"2026-01-16T15:38:01.735Z\"\n    | fieldsRename frontend.id = dt.rum.application.entity\n    | summarize {\n        app_start.cold.duration = takeFirst(if(app_start.type == \"cold\", app_start.duration)),\n        app_start.warm.duration = takeFirst(if(app_start.type == \"warm\", app_start.duration)),\n        app_start_count.cold = sum(if(app_start.type == \"cold\", app_starts)),\n        app_start_count.warm = sum(if(app_start.type == \"warm\", app_starts)),\n        app_start_count.cold.rate.per_minute = sum(if(app_start.type == \"cold\", app_start_count.rate.per_minute)),\n        app_start_count.warm.rate.per_minute = sum(if(app_start.type == \"warm\", app_start_count.rate.per_minute))\n      }, by: { frontend.id }\n  ],\n  kind: leftOuter,\n  on: { left[frontend.id] == right[frontend.id] },\n  fields: { app_start.cold.duration, app_start.warm.duration, app_start_count.cold, app_start_count.warm, app_start_count.cold.rate.per_minute, app_start_count.warm.rate.per_minute }\n// ---------------------------------------------------------------\n//  Availability metrics\n// ---------------------------------------------------------------\n| join [\n    timeseries { avgAv = avg(dt.synthetic.http.availability), numberOfDataPoints = sum(dt.synthetic.http.availability, rollup: count) },\n    by: {\n        dt.entity.http_check,\n        dt.entity.synthetic_location,\n        dt.synthetic.monitored_entity_ids\n    },\n    union: TRUE,\n    from: \"2026-01-16T03:38:01.735Z\", to: \"2026-01-16T15:38:01.735Z\"\n    | filter isNotNull(dt.synthetic.monitored_entity_ids)\n    | expand frontend.id = dt.synthetic.monitored_entity_ids\n    | append [\n        timeseries { avgAv = avg(dt.synthetic.browser.availability), numberOfDataPoints = sum(dt.synthetic.browser.availability, rollup: count) },\n        by: {\n            dt.entity.synthetic_test,\n            dt.entity.synthetic_location,\n            dt.synthetic.monitored_entity_ids\n        },\n        union: TRUE,\n        from: \"2026-01-16T03:38:01.735Z\", to: \"2026-01-16T15:38:01.735Z\"\n        | filter isNotNull(dt.synthetic.monitored_entity_ids)\n        | expand frontend.id = dt.synthetic.monitored_entity_ids\n      ]\n    | fields frontend.id, wAv = avgAv[]*numberOfDataPoints[], w = numberOfDataPoints[]\n    | summarize averageAvailability = sum(arraySum(wAv))/sum(arraySum(w)), by: { frontend.id }\n  ],\n  kind: leftOuter,\n  on: { left[frontend.id] == right[frontend.id] },\n  fields: { averageAvailability }\n// ---------------------------------------------------------------\n//  Outages\n// ---------------------------------------------------------------\n| join [\n    fetch dt.davis.events.snapshots, from: \"2026-01-16T08:38:03.204Z\", to: \"2026-01-16T15:38:03.204Z\"\n    | filter in(array(\"dt.entity.http_check\", \"dt.entity.synthetic_test\"), affected_entity_types)\n    | dedup event.id, sort:{timestamp desc}\n    | filter ( isNull(event.end) OR event.end >= toTimestamp(\"2026-01-16T03:38:01.735Z\") ) AND event.start <= toTimestamp(\"2026-01-16T15:38:01.735Z\")\n    | filter isNotNull(dt.entity.application)\n    | lookup [fetch dt.davis.events.snapshots, from: \"2026-01-16T08:38:03.204Z\", to: \"2026-01-16T15:38:03.204Z\" | dedup event.id, sort:{timestamp desc}], lookupField: event.id, sourceField: event.id, fields: { latest.event.status = event.status }\n    | fieldsAdd event.status = if(isNull(latest.event.status), \"CLOSED\", else: latest.event.status)\n    | expand frontend.id = dt.entity.application\n    | filter isNotNull(related_entity_ids)\n    | expand frontend.id = related_entity_ids\n    | summarize outages = count(), by: { frontend.id }\n  ],\n  kind: leftOuter,\n  on: { left[frontend.id] == right[frontend.id] },\n  fields: { outages }\n// ---------------------------------------------------------------\n//  Problems Affecting these Frontends\n// ---------------------------------------------------------------\n| join [\n    fetch dt.davis.events.snapshots, from: \"2026-01-16T03:38:01.735Z\", to: \"2026-01-16T15:38:01.735Z\"\n    | filter NOT event.category == \"INFO\" AND (\n            in(affected_entity_types, \"dt.entity.application\") OR\n            in(affected_entity_types, \"dt.entity.custom_application\") OR\n            in(affected_entity_types, \"dt.entity.mobile_application\")\n        )\n    | fields problem = record(event.name, event.category, affected_entity_ids), event.status, affected_entity_ids\n    | expand frontend.id = affected_entity_ids\n    | filter\n        startsWith(frontend.id, \"APPLICATION-\") OR\n        startsWith(frontend.id, \"MOBILE_APPLICATION-\") OR\n        startsWith(frontend.id, \"CUSTOM_APPLICATION-\")\n    | summarize problems = collectArray(problem), by: { frontend.id }\n  ],\n  kind: leftOuter,\n  on: { frontend.id },\n  fields: { problems }\n| fieldsAdd last_seen = lifetime[end]\n| filter page.visit.count>0\n//| fields `App`=frontend.name, `LCP(ms)` = replaceString(toString(if((toDouble(lcp))>=2500, concat(\"\",toDouble(lcp/1000000)), else: concat(\"\u2705\",toDouble(lcp/1000000)))),\".0\",\"\"),  `INP(ms)` = replaceString(toString(if((toDouble(inp/1000000))>=2500, concat(\"\u274c\",toDouble(inp/1000000)), else: concat(\"\u2705\",toDouble(inp/1000000)))),\".0\",\"\"), `FID(ms)` = replaceString(toString(if((toDouble(fid/1000000))>=2500, concat(\"\u274c\",toDouble(fid/1000000)), else: concat(\"\u2705\",toDouble(fid/1000000)))),\".0\",\"\"), `CLS(#)` = if(cls>=.1, concat(\"\u274c\",round(cls,decimals:4)), else: concat(\"\u2705\",round(cls,decimals:4))) \n| fields `App`=frontend.name, `LCP(ms)`=if(lcp>=2500, concat(\"\u274c\",round(lcp,decimals:0)), else: concat(\"\u2705\",round(lcp,decimals:0))), `INP(ms)`=if(inp>=200, concat(\"\u274c\",round(inp,decimals:0)), else: concat(\"\u2705\",round(inp,decimals:0))), `FID(ms)`=if(fid>=100, concat(\"\u274c\",round(fid,decimals:0)), else: concat(\"\u2705\",round(fid,decimals:0))), `CLS(#)`=if(cls>=.1, concat(\"\u274c\",round(cls,decimals:4)), else: concat(\"\u2705\",round(cls,decimals:4)))\n"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 1,
+        "y": 1
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {}
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "tenant_query": {
+      "name": "tenant_query",
+      "input": {
+        "query": "fetch dt.entity.environment\n| fields URL=concat(\"[Open in Dynatrace](http://\",dt.system.environment,\".apps.dynatrace.com/ui/apps/dynatrace.experience.vitals/frontends)\")\n| limit 1"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -1,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "email_cwv_report": {
+      "name": "email_cwv_report",
+      "input": {
+        "cc": [],
+        "to": [],
+        "bcc": [],
+        "content": "{{result(\"cwv_query_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant_query\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "subject": "Core Web Vitals Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "cwv_query": "OK",
+          "tenant_query": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "tenant_query",
+        "cwv_query"
+      ]
+    }
+  }
+}
