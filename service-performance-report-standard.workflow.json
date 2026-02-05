@@ -1,6 +1,9 @@
 {
+  "id": "75386bd7-14d4-446f-84b0-12f27d0e19b5",
   "title": "Service Performance Report - Standard",
   "description": "This Workflow generates Service Performance reports and emails to the specified addresses.",
+  "actor": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
+  "owner": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
   "ownerType": "USER",
   "isPrivate": true,
   "schemaVersion": 3,
@@ -27,7 +30,7 @@
     "service_performance": {
       "name": "service_performance",
       "input": {
-        "query": "timeseries {p50 = median(dt.service.request.response_time),\n           p90 = percentile(dt.service.request.response_time, 90),\n           p99 = percentile(dt.service.request.response_time, 99),\n           requests = sum(dt.service.request.count), \n           errors = sum(dt.service.request.failure_count)},\n           by:{dt.entity.service}\n| fieldsAdd p50 = round(arrayAvg(p50)/1000, decimals: 2),\n            p90 = round(arrayAvg(p90)/1000, decimals: 2),\n            p99 = round(arrayAvg(p99)/1000, decimals: 2),\n            Requests = arraySum(requests), \n            Failures = arraySum(errors)\n| fieldsAdd FailureRate = (Failures/Requests) *100\n| fieldsAdd Service = entityName(dt.entity.service)\n| filterOut isNull(Service)\n| fields Service,\n         Requests,\n         `p50(ms)` = p50,\n         `p90(ms)` = p90,\n         `p99(ms)` = p99,\n         FailureRate,\n         Failures\n| sort `p50(ms)` desc\n| limit 25"
+        "query": "timeseries {p50 = median(dt.service.request.response_time),\n           p90 = percentile(dt.service.request.response_time, 90),\n           p99 = percentile(dt.service.request.response_time, 99),\n           requests = sum(dt.service.request.count), \n           errors = sum(dt.service.request.failure_count)},\n           by:{dt.entity.service}\n| fieldsAdd p50 = round(arrayAvg(p50)/1000, decimals: 2),\n            p90 = round(arrayAvg(p90)/1000, decimals: 2),\n            p99 = round(arrayAvg(p99)/1000, decimals: 2),\n            Requests = arraySum(requests), \n            Failures = arraySum(errors)\n| fieldsAdd FailureRate = concat(round((Failures/Requests) *100, decimals: 2),\"%\")\n| fieldsAdd Service = entityName(dt.entity.service)\n| filterOut isNull(Service)\n| fields Service,\n         Requests,\n         `p50(ms)` = p50,\n         `p90(ms)` = p90,\n         `p99(ms)` = p99,\n         FailureRate,\n         Failures\n| sort `p50(ms)` desc\n| limit 25"
       },
       "action": "dynatrace.automations:execute-dql-query",
       "position": {
@@ -46,7 +49,9 @@
       "name": "email_service_report",
       "input": {
         "cc": [],
-        "to": [],
+        "to": [
+          "john.kelly@dynatrace.com"
+        ],
         "bcc": [],
         "content": "# Service Performance Report\n#\n{% for type in result(\"service_performance\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
         "subject": "Service Performance Report"
