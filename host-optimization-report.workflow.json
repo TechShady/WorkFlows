@@ -74,7 +74,7 @@
         "config": "disabled",
         "prompt": "Provide a markdown report for the following use case:\n## Optimize host sizing\nIf a user wants to optimize the size of their hosts, they generally have three goals:\n1. Shutdown potentially unused hosts\n2. Reduce over-provisioned hosts to save on cost\n3. Increase the size of under-provisioned hosts to reduce risk\n\nBe sure to provide an overview (including number of hosts per utilization) and any insights from the data provided. If possible give an estimated range of cost savings.",
         "autoTrim": true,
-        "instruction": "Instead of bulleted list, format example hosts in a table.",
+        "instruction": "Format results in a table.",
         "supplementary": "Use this analysis of p90 CPU and Memory for the past 30 days:\n{{result(\"host_utilization\")[\"records\"]}}"
       },
       "retry": {
