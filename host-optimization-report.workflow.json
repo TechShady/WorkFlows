@@ -1,0 +1,107 @@
+{
+  "title": "Host Optimization Report",
+  "description": "This agent generates host optmization reports and emails to the specified addresses.",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 3,
+  "trigger": {},
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 10,
+  "guide": "# Host Optimization Report\nGet recommendations on how to reduce cost and minimize risk by optimizing your hosts. This agent queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings, e.g.:\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "tasks": {
+    "tenant": {
+      "name": "tenant",
+      "input": {
+        "query": "fetch dt.entity.environment\n| fields URL=concat(\"[Open in Dynatrace](http://\",dt.system.environment,\".apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Hosts?perspective=Health&sort=healthIndicators%3Adescending&timeframeStart=-1d%40d&timeframeEnd=%40d)\")\n| limit 1"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -1,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "host_utilization": {
+      "name": "host_utilization",
+      "input": {
+        "query": "//Summary of host utilization\ntimeseries { cpu_p90 = percentile(dt.host.cpu.usage, 90, rollup:max, scalar: true), mem_p90 = percentile(dt.host.memory.usage, 90, rollup:max, scalar: true) }, \n  union: TRUE, by: { dt.entity.host }, from: now()-30d, to: now()\n| fieldsAdd dt.entity.host.name = entityName(dt.entity.host), cpu_p90=round(cpu_p90), mem_p90=round(mem_p90)\n| fieldsAdd utilization=coalesce(\n  if(cpu_p90 < 10 and mem_p90 < 30, \"UNUSED\"),\n  if(cpu_p90 < 30 and mem_p90 < 50, \"OVERPROVISIONED\"),\n  if(cpu_p90 > 80 and mem_p90 < 85, \"UNDERPROVISIONED\"),\n  \"NOMINAL\"\n)\n| summarize {count=count(), examples=collectArray(\n  record(dt.entity.host.name, dt.entity.host, cpu_p90, mem_p90, cloudType=entityAttr(dt.entity.host,\"cloudType\"), instanceType = coalesce(\n    if(entityAttr(dt.entity.host,\"cloudType\")==\"EC2\",entityAttr(dt.entity.host,\"additionalSystemInfo\")[system.model]),\n    entityAttr(dt.entity.host,\"azureVmSizeLabel\"),\n    entityAttr(dt.entity.host,\"gceMachineType\")\n  ))\n,maxLength:5)}, by: {utilization}"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 1,
+        "y": 1
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {}
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "email_host_report": {
+      "name": "email_host_report",
+      "input": {
+        "cc": [],
+        "to": [
+          "john.kelly@dynatrace.com"
+        ],
+        "bcc": [],
+        "content": "AI generated report:\n{{result(\"host_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "subject": "Host Optimization Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 0,
+        "y": 3
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "host_report_prompt": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "host_report_prompt"
+      ]
+    },
+    "host_report_prompt": {
+      "name": "host_report_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a markdown report for the following use case:\n## Optimize host sizing\nIf a user wants to optimize the size of their hosts, they generally have three goals:\n1. Shutdown potentially unused hosts\n2. Reduce over-provisioned hosts to save on cost\n3. Increase the size of under-provisioned hosts to reduce risk\n\nBe sure to provide an overview (including number of hosts per utilization) and any insights from the data provided. If possible give an estimated range of cost savings.",
+        "autoTrim": true,
+        "instruction": "Instead of bulleted list, format example hosts in a table.",
+        "supplementary": "Use this analysis of p90 CPU and Memory for the past 30 days:\n{{result(\"host_utilization\")[\"records\"]}}"
+      },
+      "retry": {
+        "count": 2,
+        "delay": 30,
+        "failedLoopIterationsOnly": true
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "tenant": "OK",
+          "host_utilization": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "host_utilization",
+        "tenant"
+      ]
+    }
+  }
+}
