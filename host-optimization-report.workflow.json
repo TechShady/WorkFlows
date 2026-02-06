@@ -1,6 +1,6 @@
 {
   "title": "Host Optimization Report",
-  "description": "This agent generates host optmization reports and emails to the specified addresses.",
+  "description": "This workflow generates a host optmization report and emails to the specified addresses.",
   "ownerType": "USER",
   "isPrivate": true,
   "schemaVersion": 3,
