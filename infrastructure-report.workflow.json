@@ -1,6 +1,9 @@
 {
+  "id": "7cb966b8-4ac9-4887-b5a5-b957c6b42218",
   "title": "Infrastructure Report",
   "description": "This Workflow generates infrastructure optmization reports and emails to the specified addresses.",
+  "actor": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
+  "owner": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
   "ownerType": "USER",
   "isPrivate": true,
   "schemaVersion": 3,
@@ -9,7 +12,7 @@
   "type": "STANDARD",
   "input": {},
   "hourlyExecutionLimit": 10,
-  "guide": "# Infrastructure Report\nGet a list of your top hosts (CPU, Disk & Memory) and get recommendations on how to reduce cost and minimize risk by optimizing your infrastructure. This Workflow queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "guide": "# Infrastructure Report\nGet a list of your top hosts (CPU, Disk & Memory) and get a 7 day forecast and recommendations on how to reduce cost and minimize risk by optimizing your infrastructure. This Workflow queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
   "tasks": {
     "tenant": {
       "name": "tenant",
@@ -72,10 +75,10 @@
       "name": "host_report_prompt",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a markdown report for the following use case:\n## Infrastructure Report\n",
+        "prompt": "Provide a report for the following use case:\n## Infrastructure Report\n",
         "autoTrim": true,
-        "instruction": "Instead of bulleted list, format example hosts in a table.",
-        "supplementary": "Use this analysis of CPU, Disk and Memory for the past 30 days:\n{{result(\"host_utilization\")[\"records\"]}}"
+        "instruction": "Instead of bulleted list, format hosts in a table. Also provide Forecast (Next 7 Days), Observations, Recommendations, Forecast and Next Steps.",
+        "supplementary": "Use this analysis of CPU, Disk and Memory for the past 30 days and run a forecst on CPU, Disk and Memory for the next 7 days:\n{{result(\"host_utilization\")[\"records\"]}}"
       },
       "retry": {
         "count": 2,
