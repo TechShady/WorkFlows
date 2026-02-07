@@ -1,9 +1,6 @@
 {
-  "id": "7cb966b8-4ac9-4887-b5a5-b957c6b42218",
   "title": "Infrastructure Report",
   "description": "This Workflow generates infrastructure optmization reports and emails to the specified addresses.",
-  "actor": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
-  "owner": "1f41bd32-2ce1-408d-b6e2-efb6a36f870d",
   "ownerType": "USER",
   "isPrivate": true,
   "schemaVersion": 3,
