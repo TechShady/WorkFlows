@@ -48,7 +48,7 @@
         "config": "disabled",
         "prompt": "Provide a table report for the following use case:\n## Problem Card Report\n",
         "autoTrim": true,
-        "instruction": "Provide a Summary plus Observations, Recommendations, Next Steps. Format all results in a table.",
+        "instruction": "Provide a table of the problem cards. Also provide a Summary plus Observations, Recommendations, Next Steps. Format all results in a table.",
         "supplementary": "Use this analysis of problem cards:\n{{result(\"problem_cards\")[\"records\"]}}"
       },
       "retry": {
