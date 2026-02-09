@@ -27,7 +27,7 @@
     "service_failures": {
       "name": "service_failures",
       "input": {
-        "query": "timeseries {\n  failure_count = sum(dt.service.request.failure_count, scalar: true),\n  request_count = sum(dt.service.request.count, scalar: true)\n}, by: { dt.entity.service }, from: now()-7d, to: now()\n| fieldsAdd service_name = entityName(dt.entity.service)\n| fieldsAdd failure_rate = (failure_count / request_count) * 100\n| filter failure_count > 0\n| sort failure_count desc\n| limit 20\n| fields `Service` = service_name, `Failure Count` = failure_count, `Request Count` = request_count, `Failure Rate` = concat( round(failure_rate, decimals:2),\"%\")"
+        "query": "timeseries {\n  failure_count = sum(dt.service.request.failure_count, scalar: true),\n  request_count = sum(dt.service.request.count, scalar: true)\n}, by: { dt.entity.service }, from: now()-1d, to: now()\n| fieldsAdd service_name = entityName(dt.entity.service)\n| fieldsAdd failure_rate = (failure_count / request_count) * 100\n| filter failure_count > 0\n| sort failure_count desc\n| limit 20\n| fields `Service` = service_name, `Failure Count` = failure_count, `Request Count` = request_count, `Failure Rate` = concat( round(failure_rate, decimals:2),\"%\")"
       },
       "action": "dynatrace.automations:execute-dql-query",
       "position": {
@@ -49,7 +49,7 @@
         "to": [],
         "bcc": [],
         "content": "#\n# Service Failue Report\n#\n{% for type in result(\"service_failures\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
-        "subject": "Service Failure Report"
+        "subject": "Dynatrace Service Failure Report"
       },
       "action": "dynatrace.email:send-email",
       "position": {

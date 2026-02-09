@@ -14,7 +14,7 @@
     "query": {
       "name": "query",
       "input": {
-        "query": "fetch spans\n| filter db.system != \"null\" and aggregation.count>25\n| fieldsAdd trace_id = toString(trace.id), span_id = toString(span.id)\n| fields   `N+1 Count` = aggregation.count,\n           `Query`=if(isNotNull(db.query.text),db.query.text,else:if(isNotNull(db.operation.name),db.operation.name, else: code.function)),\n           trace.id,\n           span.id,\n           span.name, \n           `Service Name` = entityName(dt.entity.service),\n           `Endpoint` = if(isnull(endpoint.name), span.name, else: endpoint.name),\n           `DB` = db.system\n| sort `N+1 Count` desc\n| limit 50"
+        "query": "fetch spans, from: @d-1d, to: @d\n| filter db.system != \"null\" and aggregation.count>25\n| fieldsAdd trace_id = toString(trace.id), span_id = toString(span.id)\n| fields   `N+1 Count` = aggregation.count,\n           `Query`=if(isNotNull(db.query.text),db.query.text,else:if(isNotNull(db.operation.name),db.operation.name, else: code.function)),\n           trace.id,\n           span.id,\n           span.name, \n           `Service Name` = entityName(dt.entity.service),\n           `Endpoint` = if(isnull(endpoint.name), span.name, else: endpoint.name),\n           `DB` = db.system\n| sort `N+1 Count` desc\n| limit 50"
       },
       "action": "dynatrace.automations:execute-dql-query",
       "position": {
@@ -36,7 +36,7 @@
         "to": [],
         "bcc": [],
         "content": "#\n# N+1 Query Problem Report\n#\n{% for type in result(\"query\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n\n",
-        "subject": "N+1 Query Problem Report"
+        "subject": "Dynatrace N+1 Query Problem Report"
       },
       "action": "dynatrace.email:send-email",
       "position": {
