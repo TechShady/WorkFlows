@@ -1,0 +1,105 @@
+{
+  "title": "Daily SLO Report",
+  "description": "This Workflow generates SLO reports and emails to the specified addresses.",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 3,
+  "trigger": {},
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 10,
+  "guide": "# SLO Report\nGet a list of your SLOs and recommendations on improvements. This Workflow queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "tasks": {
+    "slo": {
+      "name": "slo",
+      "input": {
+        "query": "fetch spans, from: @d-1d, to: @d\n| filter span.kind == \"server\"\n| filter isNotNull(endpoint.name)\n| lookup [ fetch dt.entity.service ], \n         lookupField:id, sourceField:dt.entity.service, \n         fields: {service = entity.name }\n| fieldsAdd SlowRequest = if(duration >= 2s, \"Slow\", else:\"Fast\")\n\n| summarize  {Availability = round(avg(if(request.is_failed == true, 0, else: 100)), decimals: 2),\n             Performance = round(avg(if(SlowRequest == \"Slow\", 0, else: 100)), decimals: 2)}\n             ,by:{Service = service}\n\n\n"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 1,
+        "y": 1
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {}
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "tenant": {
+      "name": "tenant",
+      "input": {
+        "query": "fetch dt.entity.environment\n| fields URL=concat(\"[Open in Dynatrace](http://\",dt.system.environment,\".apps.dynatrace.com/ui/apps/dynatrace.service.level.objectives/)\")\n| limit 1"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -1,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "email_slo_report": {
+      "name": "email_slo_report",
+      "input": {
+        "cc": [],
+        "to": [],
+        "bcc": [],
+        "content": "| Objective | Target | SLI |\n| --- | --- | --- |\n| \u2705 Availability | >= 99.5%  | Successful requests |\n| \u2705 Performance  | >= 98.0%  | Requests <= 2 seconds|\n{{result(\"slo_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "subject": "Dynatrace Daily SLO Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 0,
+        "y": 3
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "slo_report_prompt": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "slo_report_prompt"
+      ]
+    },
+    "slo_report_prompt": {
+      "name": "slo_report_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## SLO Report\n",
+        "autoTrim": true,
+        "instruction": "Instead of bulleted list, format SLOs in a table. Provide Observations, Recommendations and Next Steps.",
+        "supplementary": "Use this analysis of SLOs:\n{{result(\"slo\")[\"records\"]}}"
+      },
+      "retry": {
+        "count": 2,
+        "delay": 30,
+        "failedLoopIterationsOnly": true
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "slo": "OK",
+          "tenant": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "tenant",
+        "slo"
+      ]
+    }
+  }
+}
