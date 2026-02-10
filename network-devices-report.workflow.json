@@ -1,0 +1,105 @@
+{
+  "title": "Network Devices Report",
+  "description": "This Workflow generates Network Device reports and emails to the specified addresses.",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 3,
+  "trigger": {},
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 10,
+  "guide": "# Network Device Report\nGet a list of your top Network Devices and recommendations on how optimize your infrastructure. This Workflow queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "tasks": {
+    "tenant": {
+      "name": "tenant",
+      "input": {
+        "query": "fetch dt.entity.environment\n| fields URL=concat(\"[Open in Dynatrace](http://\",dt.system.environment,\".apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Network%20devices?perspective=Health&sidebarOpen=true)\")\n| limit 1"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -1,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "network_device_utilization": {
+      "name": "network_device_utilization",
+      "input": {
+        "query": "fetch `dt.entity.network:device`\n      | fields id, name = entity.name, type = devType, ipAddress = dt.ip_addresses, tags, extCfgGroupLabel, devMonitoringMode,\n        devSysLocation, devSysContact\n| limit 25000\n| lookup [\n  fetch dt.davis.problems.snapshots, from: toTimestamp(\"2026-02-02T16:15:46.164Z\")-6h-10m, to: toTimestamp(\"2026-02-09T16:15:46.164Z\")\n          | expand affectedDevice = affected_entity_ids\n          | filter startsWith(affectedDevice, \"CUSTOM_DEVICE\")\n          | sort timestamp\n          | summarize {\n            event.status = takeLast(event.status),\n            dt.davis.is_duplicate = takeLast(dt.davis.is_duplicate)\n          }, by: {event.id, affectedDevice}\n          | filter isNull(dt.davis.is_duplicate) OR not(dt.davis.is_duplicate)\n          | filter event.status == \"ACTIVE\"\n          | summarize problems = count(), by: {affectedDevice}\n], sourceField:id, lookupField:affectedDevice, fields:{problems}, executionOrder:leftFirst\n| fieldsAdd problemCount = toDouble(coalesce(problems, 0))\n          | fieldsRemove problems\n| lookup [\n  timeseries sysuptime = avg(com.dynatrace.extension.network_device.sysuptime)\n          , by:{`dt.entity.network:device`}, from: \"2026-02-02T16:17:00.548Z\", to: toTimestamp(\"2026-02-09T16:17:00.548Z\")-4m\n          | fields sysuptime=arrayLast(sysuptime), `dt.entity.network:device`\n], sourceField:id, lookupField:`dt.entity.network:device`, fields:{sysuptime}, executionOrder:leftFirst\n| lookup [\n  timeseries {\n            ifcBytesIn =  sum(com.dynatrace.extension.network_device.if.bytes_in.count, default: 0),\n            ifcBytesOut =  sum(com.dynatrace.extension.network_device.if.bytes_out.count, default: 0)\n          },\n          filter: isNotNull(`dt.entity.network:interface`),\n          by:{ `dt.entity.network:device`, `dt.entity.network:interface`, if.speed}, union:true, from: \"2026-02-02T16:17:00.548Z\", to: toTimestamp(\"2026-02-09T16:17:00.548Z\")-4m\n          | fieldsAdd\n            ifcBytesInSum=arraySum(ifcBytesIn),\n            ifcBytesOutSum=arraySum(ifcBytesOut),\n            ifSpeedInBytesPerMinute = ((toDouble(if.speed) * 1000000)/8)*60\n          | fieldsAdd ifcSaturation = ((arrayAvg(ifcBytesIn) + arrayAvg(ifcBytesOut))/(toDouble(interval) / 60000000000)) / ifSpeedInBytesPerMinute\n          | fieldsAdd lastBitsInOutPerSecond = (arrayAvg(ifcBytesIn)+arrayAvg(ifcBytesOut))*8/(toDouble(interval)/1000000000)\n          | summarize {\n            bitsInOutPerSecond = sum(lastBitsInOutPerSecond),\n            saturatedInterfaces = toDouble(coalesce(countIf(ifcSaturation > 0.95), 0))\n          }, by: {`dt.entity.network:device`}\n], sourceField:id, lookupField:`dt.entity.network:device`, fields:{saturatedInterfaces,bitsInOutPerSecond}, executionOrder:leftFirst\n| lookup [\n  timeseries availability = avg(dt.synthetic.multi_protocol.request.availability),\n              by:{dt.entity.multiprotocol_monitor, multi_protocol.request.target_address, request.target_address}, from: \"2026-02-02T16:17:00.548Z\", to: toTimestamp(\"2026-02-09T16:17:00.548Z\")-4m\n              | fieldsAdd targetAddress = coalesce(request.target_address, multi_protocol.request.target_address)\n              | lookup [\n                fetch `dt.entity.network:device`\n                | expand dt.ip_addresses\n              ], sourceField: targetAddress, lookupField: dt.ip_addresses, fields: {deviceId = id}\n              | filterOut isNull(deviceId)\n              | summarize {\n                availability = avg(arrayAvg(availability))\n              }, by: {monitor = dt.entity.multiprotocol_monitor, deviceId}\n              | fieldsAdd name = entityName(monitor, type: \"dt.entity.multiprotocol_monitor\")\n              | filterOut isNull(name)\n              | summarize {\n                totalMonitors = count(),\n                unavailableMonitors  = countIf(availability < 100)\n              }, by:{deviceId}\n              | fieldsAdd reachability = 100*(totalMonitors - unavailableMonitors )/toDouble(totalMonitors)\n], sourceField:id, lookupField:deviceId, fields:{reachability}, executionOrder:leftFirst\n| lookup [\n  timeseries {\n            status = avg(com.dynatrace.extension.network_device.if.status)\n          }, by: {`dt.entity.network:interface`, `dt.entity.network:device`, oper.status, admin.status}\n          | fieldsAdd record = record(\n            latestStatusIndex = arrayLastIndexOf(status, arrayLast(status)),\n            adminStatus = admin.status,\n            operStatus = oper.status,\n            device = `dt.entity.network:device`\n          )\n          | summarize record = takeMax(record), by: { `dt.entity.network:interface` }\n          | summarize {\n            adminUpOperUp = toDouble(countIf(startsWith(record[adminStatus], \"up\", caseSensitive: false) and startsWith(record[operStatus], \"up\", caseSensitive: false))),\n            adminUpOperDown = toDouble(countIf(startsWith(record[adminStatus], \"up\", caseSensitive: false) and startsWith(record[operStatus], \"down\", caseSensitive: false))),\n            adminDownOperDown = toDouble(countIf(startsWith(record[adminStatus], \"down\", caseSensitive: false) and startsWith(record[operStatus], \"down\", caseSensitive: false)))\n          }, by: {device = record[device]}\n], sourceField:id, lookupField:device, fields:{adminUpOperUp,adminUpOperDown,adminDownOperDown}, executionOrder:leftFirst\n| filterOut isNull(saturatedInterfaces)\n| fields id, name, extCfgGroupLabel, problemCount, reachability, sysuptime, adminUpOperUp, adminUpOperDown, adminDownOperDown, saturatedInterfaces"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 1,
+        "y": 1
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {}
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "email_network_device_report": {
+      "name": "email_network_device_report",
+      "input": {
+        "cc": [],
+        "to": [],
+        "bcc": [],
+        "content": "{{result(\"network_device_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "subject": "Dynatrace Network Device Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 0,
+        "y": 3
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "network_device_report_prompt": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "network_device_report_prompt"
+      ]
+    },
+    "network_device_report_prompt": {
+      "name": "network_device_report_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## Network Device Report\n",
+        "autoTrim": true,
+        "instruction": "Instead of bulleted list, format Network Devices in a table. Also provide Observations, Recommendations, Forecast and Next Steps.",
+        "supplementary": "Use this analysis:\n{{result(\"network_device_utilization\")[\"records\"]}}"
+      },
+      "retry": {
+        "count": 2,
+        "delay": 30,
+        "failedLoopIterationsOnly": true
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "tenant": "OK",
+          "network_device_utilization": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "tenant",
+        "network_device_utilization"
+      ]
+    }
+  }
+}
