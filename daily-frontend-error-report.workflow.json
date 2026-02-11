@@ -1,0 +1,91 @@
+{
+  "title": "Daily Frontend Error Report",
+  "description": "",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 3,
+  "trigger": {},
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 1000,
+  "guide": "# Frontend Errors Report\nGet a list of your top Frontend Errors and recommendations on how optimize your web application(s). This Workflow queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "tasks": {
+    "tenant": {
+      "name": "tenant",
+      "input": {
+        "query": "fetch dt.entity.environment\n| fields URL=concat(\"[Open in Dynatrace](http://\",dt.system.environment,\".apps.dynatrace.com/ui/apps/dynatrace.error.inspector/?tf=-1d%40d%3B%40d)\")\n| limit 1"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -1,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "send_email_2": {
+      "name": "send_email_2",
+      "input": {
+        "cc": [],
+        "to": [],
+        "bcc": [],
+        "content": "{{result(\"frontend_errors_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "subject": "Dynatrace Daily Frontend Errors Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 0,
+        "y": 3
+      },
+      "conditions": {
+        "states": {
+          "frontend_errors_prompt": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "frontend_errors_prompt"
+      ]
+    },
+    "frontend_errors": {
+      "name": "frontend_errors",
+      "input": {
+        "query": "fetch user.events, from: @d-1d, to: @d\n| filter characteristics.has_error\n| filter isNotNull(error.type)\n| filter isNotNull(error.id)\n\n| fieldsAdd frontend_name = coalesce(\n  entityName(dt.rum.application.entity, type: \"dt.entity.application\"), \n  entityName(dt.rum.application.entity, type: \"dt.entity.mobile_application\")\n)\n\n\n| summarize {\n    count = count(),\n    affected_users = countDistinct(dt.rum.instance.id, precision: 9),\n    last_occurrence = max(start_time),\n    error = record(\n      display_name = takeFirst(error.display_name), \n      os_names = collectDistinct(os.name, maxLength: 100), \n      type = takeFirst(error.type),\n      is_web = startsWith(takeAny(dt.rum.application.entity), \"APPLICATION\"),\n      url_provider = takeFirst(url.provider)\n    )\n}, by: {error.id}\n| fieldsAdd id = error.id\n          \n| sort isNull(affected_users) asc, affected_users desc\n| limit 100\n| lookup [\n  \n    fetch user.events, samplingRatio: 1\n      | fieldsAdd id = toString(error.id)\n      | lookup\n        [fetch dt.entity.application| append [fetch dt.entity.mobile_application] | fields id, entity.name],\n          sourceField: dt.rum.application.entity,\n          lookupField:id,\n          prefix:\"application_lookup.\"\n      | fieldsAdd application_lookup.id_ = application_lookup.id, application_lookup.name_ = application_lookup.entity.name\n      | summarize {\n          count = count()\n        }, by: {error.id, application_lookup.name_}\n      | sort count desc\n      | summarize {\n          values = collectArray(application_lookup.name_)\n        }, by: {error.id}\n      | fieldsAdd frontend_result = record(\n          values,\n          errorId = error.id\n      )\n  \n], sourceField:id, lookupField:error.id, fields:{frontend_result}, executionOrder:leftFirst\n| fields Error = array(error[display_name]), affected_users, count, Impacted = replaceString(frontend_result[values][], \"[\", \"\")\n| sort affected_users desc"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 1,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "frontend_errors_prompt": {
+      "name": "frontend_errors_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## Frontend Error Report\n",
+        "autoTrim": true,
+        "instruction": "Instead of bulleted list, format Frontend Errors in a table. Also provide Observations, Recommendations, Forecast and Next Steps.",
+        "supplementary": "Use this analysis:\n{{result(\"frontend_errors\")[\"records\"]}}"
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "conditions": {
+        "states": {
+          "tenant": "OK",
+          "frontend_errors": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "tenant",
+        "frontend_errors"
+      ]
+    }
+  }
+}
