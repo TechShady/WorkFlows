@@ -54,10 +54,10 @@
       "name": "dashboard_prompt",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a markdown report for the following use case:\n## Service Overview Dashboard Analysis Report\n",
+        "prompt": "Provide a report for the following use case:\n## Service Overview Dashboard Analysis Report\nUse this analysis:\n{{result(\"services_current_status\")[\"records\"]}}\n{{result(\"problems_list\")[\"records\"]}}\n{{result(\"service_summary\")[\"records\"]}}\n{{result(\"service_latency\")[\"records\"]}}",
         "autoTrim": true,
-        "instruction": "Provide a Summary, Observations, Recommendations and Next Steps for each query",
-        "supplementary": "Use this analysis:\n{{result(\"services_current_status\")[\"records\"]}}\n{{result(\"problems_list\")[\"records\"]}}\n{{result(\"service_summary\")[\"records\"]}}\n{{result(\"service_latency\")[\"records\"]}}\n"
+        "instruction": "Provide a Summary, Insights, Observations, Recommendations and Next Steps for each query.",
+        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\n"
       },
       "retry": {
         "count": 2,
