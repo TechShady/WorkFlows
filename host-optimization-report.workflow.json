@@ -46,9 +46,7 @@
       "name": "email_host_report",
       "input": {
         "cc": [],
-        "to": [
-          "john.kelly@dynatrace.com"
-        ],
+        "to": [],
         "bcc": [],
         "content": "# AI Generated Analysis\n{{result(\"host_report_prompt\").text}}\n# ___________________________________\n#\n# Host Details\n#\n## Unused Hosts\n#\n{% for type in result(\"unused_hosts\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n# ___________________________________\n#\n## Over Provisioned Hosts\n#\n{% for type in result(\"over_provisioned_hosts\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n# ___________________________________\n#\n## Under Provisioned Hosts\n#\n{% for type in result(\"under_provisioned_hosts\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n# ___________________________________\n[Open in Dynatrace](http://{{environment().id}}.apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Hosts?perspective=Health&sort=healthIndicators%3Adescending&timeframeStart=-1d%40d&timeframeEnd=%40d)\n# ___________________________________\n",
         "subject": "Host Optimization Report"
