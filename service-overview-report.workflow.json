@@ -33,9 +33,7 @@
       "name": "email_service_report",
       "input": {
         "cc": [],
-        "to": [
-          "john.kelly@dynatrace.com"
-        ],
+        "to": [],
         "bcc": [],
         "content": "{{result(\"service_overview_report_prompt\").text}}\n# ___________________________________\n[Open Dashboard](https://{{environment().id}}.apps.dynatrace.com/ui/apps/dynatrace.dashboards/dashboard/3f454f2a-208f-4558-95bd-0a18bdfe6d5f#vfilter_Service=3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*&from=now%28%29-2h&to=now%28%29)\n# ___________________________________\n",
         "subject": "Service Overview Report"
