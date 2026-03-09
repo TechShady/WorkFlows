@@ -1,0 +1,92 @@
+{
+  "title": "Service Overview Report",
+  "description": "This Workflow generates Service Performance reports and emails to the specified addresses.",
+  "ownerType": "USER",
+  "isPrivate": true,
+  "schemaVersion": 3,
+  "trigger": {},
+  "result": null,
+  "type": "STANDARD",
+  "input": {},
+  "hourlyExecutionLimit": 10,
+  "guide": "# Service Overview Report\nGet a list of your top Services. This Workflow queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
+  "tasks": {
+    "service_overview": {
+      "name": "service_overview",
+      "input": {
+        "query": "timeseries {latency_p50 = median(dt.service.request.response_time),\n           latency_p90 = percentile(dt.service.request.response_time, 90),\n           latency_p99 = percentile(dt.service.request.response_time, 99),\n           requests = sum(dt.service.request.count), \n           errors = sum(dt.service.request.failure_count), from: @d-1d, to: @d},\n           by:{dt.entity.service}\n| lookup [ timeseries latency_avg = avg(dt.service.request.response_time),\n           by:{dt.entity.service}],\n            sourceField:dt.entity.service, lookupField:dt.entity.service,\n            prefix: \"latencyAvg.\"\n| lookup [ timeseries http_5xx = sum(dt.service.request.count,default: 0.0),\n           by:{dt.entity.service},\n           filter: (http.response.status_code >= 500 and http.response.status_code <= 599)],\n            sourceField:dt.entity.service, lookupField:dt.entity.service,\n            prefix: \"http5xx.\"\n| lookup [ timeseries http_4xx = sum(dt.service.request.count,default: 0.0),\n           by:{dt.entity.service},\n           filter: (http.response.status_code >= 400 and http.response.status_code <= 499)],\n            sourceField:dt.entity.service, lookupField:dt.entity.service,\n            prefix: \"http4xx.\"\n| fieldsAdd Latency_Avg = arrayAvg(latencyAvg.latency_avg),\n            Latency_p50 = arrayAvg(latency_p50),\n            Latency_p90 = arrayAvg(latency_p90),\n            Latency_p99 = arrayAvg(latency_p99),\n            Requests = arraySum(requests), \n            Failures = arraySum(errors),\n            Errors500 = arraySum(http5xx.http_5xx),\n            Errors400 = arraySum(http4xx.http_4xx)\n| fieldsAdd FailureRate = (Failures/Requests) *100\n| fieldsAdd Service = entityName(dt.entity.service)\n| fields Service,\n         Requests,\n         Latency_Avg,\n         Latency_p50,\n         Latency_p90,\n         Latency_p99,\n         FailureRate,\n         `Failures` = if(Failures == 0,\"0\", else:concat(\"[\",Failures,\"](https://\",\"{{environment().id}}\",\".apps.dynatrace.com/ui/apps/dynatrace.services/failure-analysis?filter=dt.entity.service+%3D+\",dt.entity.service,\"+AND+request.status_code+%3D+Failure&tf=-1d%40d%3B%40d\")),\n         `5xx` = if(isNull(Errors500), \"0\", else:concat(\"[\",round(Errors500,decimals:0),\"](https://\",\"{{environment().id}}\",\".apps.dynatrace.com/ui/apps/dynatrace.distributedtracing/explorer?filter=dt.entity.service+%3D+\",dt.entity.service,\"+AND+http.response.status_code+>%3D+500+AND+http.response.status_code+<%3D+599&tf=-1d%40d%3B%40d\")),\n         `4xx` = if(isNull(Errors400), \"0\", else:concat(\"[\",round(Errors400,decimals:0),\"](https://\",\"{{environment().id}}\",\".apps.dynatrace.com/ui/apps/dynatrace.distributedtracing/explorer?filter=dt.entity.service+%3D+\",dt.entity.service,\"+AND+http.response.status_code+>%3D+400+AND+http.response.status_code+<%3D+499&tf=-1d%40d%3B%40d\"))\n\n| sort Requests desc\n| limit 25"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 0,
+        "y": 1
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {}
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "email_service_report": {
+      "name": "email_service_report",
+      "input": {
+        "cc": [],
+        "to": [
+          "john.kelly@dynatrace.com"
+        ],
+        "bcc": [],
+        "content": "{{result(\"service_overview_report_prompt\").text}}\n# ___________________________________\n[Open Dashboard](https://{{environment().id}}.apps.dynatrace.com/ui/apps/dynatrace.dashboards/dashboard/3f454f2a-208f-4558-95bd-0a18bdfe6d5f#vfilter_Service=3420b2ac-f1cf-4b24-b62d-61ba1ba8ed05*&from=now%28%29-2h&to=now%28%29)\n# ___________________________________\n",
+        "subject": "Service Overview Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 0,
+        "y": 3
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "service_overview_report_prompt": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "service_overview_report_prompt"
+      ]
+    },
+    "service_overview_report_prompt": {
+      "name": "service_overview_report_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case for the top 25 Services:\n## Service Overview Report\n",
+        "autoTrim": true,
+        "instruction": "Instead of bulleted list, format all Services in a 25 row table. \nProvide the full table.\nProvide Notes for each service in the table.\nAlso provide an overall Summary, Observations, Recommendations and Next Steps below the table.\nMake sure to include `Failures`, `5xx` and `4xx` links as columns in the table.\nOrder the columns of the table as follows: \nService, Requests, Latency_Avg, Latency_p50, Latency_p90, Latency_p99, FailureRate, Failures, 5xx, 4xx and Notes.\nLatency_Avg is in ms.",
+        "supplementary": "Use this analysis for the complete list of top 25 Services:\n{{result(\"service_overview\")[\"records\"]}}"
+      },
+      "retry": {
+        "count": 2,
+        "delay": 30,
+        "failedLoopIterationsOnly": true
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": 0,
+        "y": 2
+      },
+      "conditions": {
+        "else": "SKIP",
+        "custom": "",
+        "states": {
+          "service_overview": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "service_overview"
+      ]
+    }
+  }
+}
