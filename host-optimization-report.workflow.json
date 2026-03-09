@@ -11,10 +11,10 @@
   "hourlyExecutionLimit": 10,
   "guide": "# Host Optimization Report\nGet recommendations on how to reduce cost and minimize risk by optimizing your hosts. This workflow queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings, e.g.:\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
   "tasks": {
-    "tenant": {
-      "name": "tenant",
+    "unused_hosts": {
+      "name": "unused_hosts",
       "input": {
-        "query": "fetch dt.entity.environment\n| fields URL=concat(\"[Open in Dynatrace](http://\",dt.system.environment,\".apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Hosts?perspective=Health&sort=healthIndicators%3Adescending&timeframeStart=-1d%40d&timeframeEnd=%40d)\")\n| limit 1"
+        "query": "timeseries { cpu_p90 = percentile(dt.host.cpu.usage, 90, rollup:max, scalar: true), mem_p90 = percentile(dt.host.memory.usage, 90, rollup:max, scalar: true) }, \n  union: TRUE, by: { dt.entity.host }, from: now()-30d, to: now()\n| fieldsAdd dt.entity.host.name = entityName(dt.entity.host), cpu_p90=round(cpu_p90), mem_p90=round(mem_p90)\n| filter cpu_p90<10 and mem_p90<30\n| fields Host = concat(\"[\",dt.entity.host.name,\"](https://\",\"{{environment().id}}\",\".apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Hosts?perspective=Health&sort=healthIndicators%3Adescending&fullPageId=\",dt.entity.host,\"&timeframeStart=now%28%29-30d&timeframeEnd=now%28%29)\"), `CPU (%)`=cpu_p90, `Memory (%)`=mem_p90\n"
       },
       "action": "dynatrace.automations:execute-dql-query",
       "position": {
@@ -31,7 +31,7 @@
       },
       "action": "dynatrace.automations:execute-dql-query",
       "position": {
-        "x": 1,
+        "x": 0,
         "y": 1
       },
       "conditions": {
@@ -46,9 +46,11 @@
       "name": "email_host_report",
       "input": {
         "cc": [],
-        "to": [],
+        "to": [
+          "john.kelly@dynatrace.com"
+        ],
         "bcc": [],
-        "content": "AI generated report:\n{{result(\"host_report_prompt\").text}}\n# ___________________________________\n{% for type in result(\"tenant\").records %}\n    {% for key, value in type.items() %} {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %}  \n{% endfor %}\n# ___________________________________\n",
+        "content": "# AI Generated Analysis\n{{result(\"host_report_prompt\").text}}\n# ___________________________________\n#\n# Host Details\n#\n## Unused Hosts\n#\n{% for type in result(\"unused_hosts\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n# ___________________________________\n#\n## Over Provisioned Hosts\n#\n{% for type in result(\"over_provisioned_hosts\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n# ___________________________________\n#\n## Under Provisioned Hosts\n#\n{% for type in result(\"under_provisioned_hosts\").records %}\n    {% if loop.first %}\n           {% for key in type.keys() %}| {{key}} {% endfor %} |\n           {% for key in type.keys() %}| ---------  {% endfor %} |\n    {% endif %}\n    {% for key, value in type.items() %}| {{value | replace('|', '\\\\|') | replace('\\n', ' ') | replace('\\r', '') | replace('\\t', ' ')}} {% endfor %} | \n{% endfor %}\n# ___________________________________\n[Open in Dynatrace](http://{{environment().id}}.apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Hosts?perspective=Health&sort=healthIndicators%3Adescending&timeframeStart=-1d%40d&timeframeEnd=%40d)\n# ___________________________________\n",
         "subject": "Host Optimization Report"
       },
       "action": "dynatrace.email:send-email",
@@ -60,12 +62,18 @@
         "else": "SKIP",
         "custom": "",
         "states": {
-          "host_report_prompt": "OK"
+          "unused_hosts": "OK",
+          "host_report_prompt": "OK",
+          "over_provisioned_hosts": "OK",
+          "under_provisioned_hosts": "OK"
         }
       },
       "description": "Send email",
       "predecessors": [
-        "host_report_prompt"
+        "host_report_prompt",
+        "unused_hosts",
+        "over_provisioned_hosts",
+        "under_provisioned_hosts"
       ]
     },
     "host_report_prompt": {
@@ -91,15 +99,39 @@
         "else": "SKIP",
         "custom": "",
         "states": {
-          "tenant": "OK",
           "host_utilization": "OK"
         }
       },
       "description": "Prompt the Dynatrace Intelligence generative AI",
       "predecessors": [
-        "host_utilization",
-        "tenant"
+        "host_utilization"
       ]
+    },
+    "over_provisioned_hosts": {
+      "name": "over_provisioned_hosts",
+      "input": {
+        "query": "timeseries { cpu_p90 = percentile(dt.host.cpu.usage, 90, rollup:max, scalar: true), mem_p90 = percentile(dt.host.memory.usage, 90, rollup:max, scalar: true) }, \n  union: TRUE, by: { dt.entity.host }, from: now()-30d, to: now()\n| fieldsAdd dt.entity.host.name = entityName(dt.entity.host), cpu_p90=round(cpu_p90), mem_p90=round(mem_p90)\n| filter cpu_p90>80 and mem_p90<85\n| fields Host = concat(\"[\",dt.entity.host.name,\"](https://\",\"{{environment().id}}\",\".apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Hosts?perspective=Health&sort=healthIndicators%3Adescending&fullPageId=\",dt.entity.host,\"&timeframeStart=now%28%29-30d&timeframeEnd=now%28%29)\"), `CPU (%)`=cpu_p90, `Memory (%)`=mem_p90\n"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -2,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "under_provisioned_hosts": {
+      "name": "under_provisioned_hosts",
+      "input": {
+        "query": "timeseries { cpu_p90 = percentile(dt.host.cpu.usage, 90, rollup:max, scalar: true), mem_p90 = percentile(dt.host.memory.usage, 90, rollup:max, scalar: true) }, \n  union: TRUE, by: { dt.entity.host }, from: now()-30d, to: now()\n| fieldsAdd dt.entity.host.name = entityName(dt.entity.host), cpu_p90=round(cpu_p90), mem_p90=round(mem_p90)\n| filter cpu_p90<30 and mem_p90<50\n| fields Host = concat(\"[\",dt.entity.host.name,\"](https://\",\"{{environment().id}}\",\".apps.dynatrace.com/ui/apps/dynatrace.infraops/explorer/Hosts?perspective=Health&sort=healthIndicators%3Adescending&fullPageId=\",dt.entity.host,\"&timeframeStart=now%28%29-30d&timeframeEnd=now%28%29)\"), `CPU (%)`=cpu_p90, `Memory (%)`=mem_p90\n"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 1,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
     }
   }
 }
