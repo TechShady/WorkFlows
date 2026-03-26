@@ -3,7 +3,7 @@
   "description": "This Workflow generates Service Performance reports and emails to the specified addresses.",
   "ownerType": "USER",
   "isPrivate": true,
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "trigger": {},
   "result": null,
   "type": "STANDARD",
@@ -11,6 +11,32 @@
   "hourlyExecutionLimit": 10,
   "guide": "# Service Performance Report\nGet a list of your top Services. This Workflow queries Grail and provides data to Dynatrace Assist to get recommendations. These recommendations are then sent to email(s) of your choice.\n\n# Setup\n1. Change emails (`to`, `cc`, `bcc`) to be an array of strings.\n2. Test with a manual Run, by click the `Run` button.\n3. If everything works as expected, change the [Trigger](?trigger=) to a schedule, e.g. Weekly, Daily, etc.\n\n# More advanced interactions\nConsider using our MCP server, [local](https://github.com/dynatrace-oss/dynatrace-mcp) or [remote](https://docs.dynatrace.com/docs/discover-dynatrace/platform/davis-ai/dynatrace-mcp ).",
   "tasks": {
+    "log_count": {
+      "name": "log_count",
+      "input": {
+        "query": "fetch logs\n| summarize count = count()"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -3,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "browser_name": {
+      "name": "browser_name",
+      "input": {
+        "query": "fetch user.sessions\n| fields  browser.name\n| filterOut isNull(browser.name)\n| summarize count(), by:{browser.name}\n| sort `count()` desc"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 3,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
     "problems_list": {
       "name": "problems_list",
       "input": {
@@ -19,6 +45,19 @@
       "action": "dynatrace.automations:execute-dql-query",
       "position": {
         "x": 0,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "geo_load_times": {
+      "name": "geo_load_times",
+      "input": {
+        "query": "fetch user.events\n| fieldsAdd performance.load_event_end\n| summarize avg(performance.load_event_end/1000000),  by : {geo.country.iso_code}\n| filter isNotNull(geo.country.iso_code)\n| sort `avg(performance.load_event_end / 1000000)` desc"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": -4,
         "y": 1
       },
       "description": "Make use of Dynatrace Grail data in your workflow.",
@@ -50,19 +89,75 @@
       "description": "Make use of Dynatrace Grail data in your workflow.",
       "predecessors": []
     },
-    "dashboard_prompt": {
-      "name": "dashboard_prompt",
+    "log_count_prompt": {
+      "name": "log_count_prompt",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a report for the following use case:\n## Service Overview Dashboard Analysis Report\nUse this analysis:\n{{result(\"services_current_status\")[\"records\"]}}\n{{result(\"problems_list\")[\"records\"]}}\n{{result(\"service_summary\")[\"records\"]}}\n{{result(\"service_latency\")[\"records\"]}}",
+        "prompt": "Provide a report for the following use case:\n## Log Count Analysis Report\n",
         "autoTrim": true,
-        "instruction": "Provide a Summary, Insights, Observations, Recommendations and Next Steps for each query.",
-        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\n"
+        "instruction": "Provide a Summary, Insights, Observations and Recommendations.",
+        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"log_count\")[\"records\"]}}\n"
       },
-      "retry": {
-        "count": 2,
-        "delay": 30,
-        "failedLoopIterationsOnly": true
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": -3,
+        "y": 2
+      },
+      "conditions": {
+        "states": {
+          "log_count": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "log_count"
+      ]
+    },
+    "logs_by_log_level": {
+      "name": "logs_by_log_level",
+      "input": {
+        "query": "fetch logs\n| summarize count = count(), by:{loglevel}"
+      },
+      "action": "dynatrace.automations:execute-dql-query",
+      "position": {
+        "x": 2,
+        "y": 1
+      },
+      "description": "Make use of Dynatrace Grail data in your workflow.",
+      "predecessors": []
+    },
+    "browser_name_prompt": {
+      "name": "browser_name_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## Browser Name Analysis Report\n",
+        "autoTrim": true,
+        "instruction": "Provide a Summary, Insights, Observations and Recommendations.",
+        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"browser_name\")[\"records\"]}}\n"
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": 3,
+        "y": 2
+      },
+      "conditions": {
+        "states": {
+          "browser_name": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "browser_name"
+      ]
+    },
+    "problems_list_prompt": {
+      "name": "problems_list_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## Problems List Analysis Report\n",
+        "autoTrim": true,
+        "instruction": "Provide a Summary, Insights, Observations and Recommendations.",
+        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"problems_list\")[\"records\"]}}\n"
       },
       "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
       "position": {
@@ -70,21 +165,37 @@
         "y": 2
       },
       "conditions": {
-        "else": "SKIP",
-        "custom": "",
         "states": {
-          "problems_list": "OK",
-          "service_latency": "OK",
-          "service_summary": "OK",
-          "services_current_status": "OK"
+          "problems_list": "OK"
         }
       },
       "description": "Prompt the Dynatrace Intelligence generative AI",
       "predecessors": [
-        "services_current_status",
-        "problems_list",
-        "service_summary",
-        "service_latency"
+        "problems_list"
+      ]
+    },
+    "geo_load_times_prompt": {
+      "name": "geo_load_times_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## Geo Load Times Analysis Report\n",
+        "autoTrim": true,
+        "instruction": "Provide a Summary, Insights, Observations and Recommendations.",
+        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"geo_load_times\")[\"records\"]}}\n"
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": -4,
+        "y": 2
+      },
+      "conditions": {
+        "states": {
+          "geo_load_times": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "geo_load_times"
       ]
     },
     "email_dashboard_report": {
@@ -93,7 +204,7 @@
         "cc": [],
         "to": [],
         "bcc": [],
-        "content": "{{result(\"dashboard_prompt\").text}}\n",
+        "content": "{{result(\"service_latency_prompt\").text}}\n{{result(\"services_current_status_prompt\").text}}\n{{result(\"problems_list_prompt\").text}}\n{{result(\"service_summary_prompt\").text}}\n{{result(\"logs_by_log_level_prompt\").text}}\n{{result(\"log_count_prompt\").text}}\n{{result(\"browser_name_prompt\").text}}\n{{result(\"geo_load_times_prompt\").text}}\n",
         "subject": "Service Overview Dashboard Analysis Report"
       },
       "action": "dynatrace.email:send-email",
@@ -105,12 +216,74 @@
         "else": "SKIP",
         "custom": "",
         "states": {
-          "dashboard_prompt": "OK"
+          "log_count_prompt": "OK",
+          "browser_name_prompt": "OK",
+          "problems_list_prompt": "OK",
+          "geo_load_times_prompt": "OK",
+          "service_latency_prompt": "OK",
+          "service_summary_prompt": "OK",
+          "logs_by_log_level_prompt": "OK",
+          "services_current_status_prompt": "OK"
         }
       },
       "description": "Send email",
       "predecessors": [
-        "dashboard_prompt"
+        "service_latency_prompt",
+        "services_current_status_prompt",
+        "problems_list_prompt",
+        "service_summary_prompt",
+        "logs_by_log_level_prompt",
+        "log_count_prompt",
+        "browser_name_prompt",
+        "geo_load_times_prompt"
+      ]
+    },
+    "service_latency_prompt": {
+      "name": "service_latency_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## Service Latency Analysis Report\n",
+        "autoTrim": true,
+        "instruction": "Provide a Summary, Insights, Observations and Recommendations.",
+        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"service_latency\")[\"records\"]}}\n"
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": -2,
+        "y": 2
+      },
+      "conditions": {
+        "states": {
+          "service_latency": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "service_latency"
+      ]
+    },
+    "service_summary_prompt": {
+      "name": "service_summary_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## Service Summary Analysis Report\n",
+        "autoTrim": true,
+        "instruction": "Provide a Summary, Insights, Observations and Recommendations.",
+        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"service_summary\")[\"records\"]}}\n"
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": 1,
+        "y": 2
+      },
+      "conditions": {
+        "states": {
+          "service_summary": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "service_summary"
       ]
     },
     "services_current_status": {
@@ -130,6 +303,54 @@
       },
       "description": "Make use of Dynatrace Grail data in your workflow.",
       "predecessors": []
+    },
+    "logs_by_log_level_prompt": {
+      "name": "logs_by_log_level_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## Logs By Log Level Analysis Report\n",
+        "autoTrim": true,
+        "instruction": "Provide a Summary, Insights, Observations and Recommendations.",
+        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"logs_by_log_level\")[\"records\"]}}\n"
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": 2,
+        "y": 2
+      },
+      "conditions": {
+        "states": {
+          "logs_by_log_level": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "logs_by_log_level"
+      ]
+    },
+    "services_current_status_prompt": {
+      "name": "services_current_status_prompt",
+      "input": {
+        "config": "disabled",
+        "prompt": "Provide a report for the following use case:\n## Services Current Status Analysis Report\n",
+        "autoTrim": true,
+        "instruction": "Provide a Summary, Insights, Observations and Recommendations.",
+        "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"services_current_status\")[\"records\"]}}\n"
+      },
+      "action": "dynatrace.davis.copilot.workflow.actions:davis-copilot",
+      "position": {
+        "x": -1,
+        "y": 2
+      },
+      "conditions": {
+        "states": {
+          "services_current_status": "OK"
+        }
+      },
+      "description": "Prompt the Dynatrace Intelligence generative AI",
+      "predecessors": [
+        "services_current_status"
+      ]
     }
   }
 }
