@@ -24,30 +24,6 @@
       "description": "Make use of Dynatrace Grail data in your workflow.",
       "predecessors": []
     },
-    "send_email": {
-      "name": "send_email",
-      "input": {
-        "cc": [],
-        "to": [],
-        "bcc": [],
-        "content": "{{result(\"overall_prompt\").text}}",
-        "subject": "Service Overview Dashboard Executive Report"
-      },
-      "action": "dynatrace.email:send-email",
-      "position": {
-        "x": 0,
-        "y": 4
-      },
-      "conditions": {
-        "states": {
-          "overall_prompt": "OK"
-        }
-      },
-      "description": "Send email",
-      "predecessors": [
-        "overall_prompt"
-      ]
-    },
     "browser_name": {
       "name": "browser_name",
       "input": {
@@ -175,6 +151,30 @@
         "log_count"
       ]
     },
+    "email_exec_report": {
+      "name": "email_exec_report",
+      "input": {
+        "cc": [],
+        "to": [],
+        "bcc": [],
+        "content": "#\n# Dashboard Overall Summary \n#\n{{result(\"overall_prompt\").text}}\n",
+        "subject": "Dynatrace Service Overview Dashboard Executive Summary Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": 1,
+        "y": 4
+      },
+      "conditions": {
+        "states": {
+          "overall_prompt": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "overall_prompt"
+      ]
+    },
     "logs_by_log_level": {
       "name": "logs_by_log_level",
       "input": {
@@ -258,6 +258,30 @@
       "description": "Prompt the Dynatrace Intelligence generative AI",
       "predecessors": [
         "geo_load_times"
+      ]
+    },
+    "email_dashboard_report": {
+      "name": "email_dashboard_report",
+      "input": {
+        "cc": [],
+        "to": [],
+        "bcc": [],
+        "content": "#\n# Dashboard Overall Summary\n#\n{{result(\"overall_prompt\").text}}\n#\n# Dashboard Tile Summary\n#\n{{result(\"service_latency_prompt\").text}}\n{{result(\"services_current_status_prompt\").text}}\n{{result(\"problems_list_prompt\").text}}\n{{result(\"service_summary_prompt\").text}}\n{{result(\"logs_by_log_level_prompt\").text}}\n{{result(\"log_count_prompt\").text}}\n{{result(\"browser_name_prompt\").text}}\n{{result(\"geo_load_times_prompt\").text}}\n",
+        "subject": "Dynatrace Service Overview Dashboard Tile Report"
+      },
+      "action": "dynatrace.email:send-email",
+      "position": {
+        "x": -1,
+        "y": 4
+      },
+      "conditions": {
+        "states": {
+          "overall_prompt": "OK"
+        }
+      },
+      "description": "Send email",
+      "predecessors": [
+        "overall_prompt"
       ]
     },
     "service_latency_prompt": {
