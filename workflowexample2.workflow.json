@@ -208,7 +208,7 @@
       "name": "log_count_prompt_2",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a report for the following use case:\n## Log Count KPI Analysis Report",
+        "prompt": "Provide a simple yes/no answer with no other details for the following use case:\n## Log Count KPI Analysis Report",
         "autoTrim": true,
         "instruction": "Simple yes/no, does the analysis need my attention?",
         "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"log_count\")[\"records\"]}}"
@@ -280,7 +280,7 @@
       "name": "browser_name_prompt_2",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a report for the following use case:\n## Browser Name KPI Analysis Report",
+        "prompt": "Provide a simple yes/no answer with no other details for the following use case:\n## Browser Name KPI Analysis Report",
         "autoTrim": true,
         "instruction": "Simple yes/no, does the analysis need my attention?",
         "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"browser_name\")[\"records\"]}}"
@@ -352,7 +352,7 @@
       "name": "problems_list_prompt_2",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a report for the following use case:\n## Problems List KPI Analysis Report",
+        "prompt": "Provide a simple yes/no answer with no other details for the following use case:\n## Problems List KPI Analysis Report",
         "autoTrim": true,
         "instruction": "Simple yes/no, does the analysis need my attention?",
         "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"services_current_status\")[\"records\"]}}"
@@ -424,7 +424,7 @@
       "name": "geo_load_times_prompt_2",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a report for the following use case:\n## GEO Load Times KPI Analysis Report\n",
+        "prompt": "Provide a simple yes/no answer with no other details for the following use case:\n## GEO Load Times KPI Analysis Report\n",
         "autoTrim": true,
         "instruction": "Simple yes/no, does the analysis need my attention?",
         "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"geo_load_times\")[\"records\"]}}"
@@ -490,7 +490,7 @@
       "name": "service_latency_prompt_2",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a report for the following use case:\n## Service Latency KPI Analysis Report",
+        "prompt": "Provide a simple yes/no answer with no other details for the following use case:\n## Service Latency KPI Analysis Report",
         "autoTrim": true,
         "instruction": "Simple yes/no, does the analysis need my attention?",
         "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"service_latency\")[\"records\"]}}"
@@ -514,7 +514,7 @@
       "name": "service_summary_prompt_2",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a report for the following use case:\n## Service Summary KPI Analysis Report",
+        "prompt": "Provide a simple yes/no answer with no other details for the following use case:\n## Service Summary KPI Analysis Report",
         "autoTrim": true,
         "instruction": "Simple yes/no, does the analysis need my attention?",
         "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"service_summary\")[\"records\"]}}"
@@ -538,7 +538,7 @@
       "name": "logs_by_log_level_prompt_2",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a report for the following use case:\n## Logs By Log Level KPI Analysis Report",
+        "prompt": "Provide a simple yes/no answer with no other details for the following use case:\n## Logs By Log Level KPI Analysis Report",
         "autoTrim": true,
         "instruction": "Simple yes/no, does the analysis need my attention?",
         "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"logs_by_log_level\")[\"records\"]}}"
@@ -586,7 +586,7 @@
       "name": "services_current_status_prompt_2",
       "input": {
         "config": "disabled",
-        "prompt": "Provide a report for the following use case:\n## Services Current Status KPI Analysis Report",
+        "prompt": "Provide a simple yes/no answer with no other details for the following use case:\n## Services Current Status KPI Analysis Report",
         "autoTrim": true,
         "instruction": "Simple yes/no, does the analysis need my attention?",
         "supplementary": "Format examples in tables instead of bulleted lists.\nWhere applicable convert units for readability, e.g. 1000000000 bytes is 1 TiB.\nWhere applicable show relative percentages, e.g. 100 used and 1000 allocatable is 10% utilized.\nUse this analysis:\n{{result(\"services_current_status\")[\"records\"]}}"
